@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>מערכת חידונים - שמירה וטעינה</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root { --red: #e21b3c; --blue: #1368ce; --yellow: #d89e00; --green: #26890c; --purple: #46178f; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f2f2f2; text-align: center; }
+        .screen { display: none; padding: 20px; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+        .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 95%; max-width: 1000px; }
+        .admin-opt { padding: 30px; color: white; font-size: 1.5rem; border-radius: 15px; font-weight: bold; }
+        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: 70vh; }
+        .user-btn { border: none; border-radius: 20px; cursor: pointer; }
+        button.main-btn { padding: 12px 25px; font-size: 1.1rem; background: var(--purple); color: white; border: none; border-radius: 10px; cursor: pointer; margin: 5px; }
+        #room-code { background: white; padding: 10px 25px; border-radius: 50px; font-size: 1.8rem; color: var(--purple); font-weight: bold; border: 3px solid var(--purple); margin-bottom: 20px; }
+        .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
+        .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
+        .creator-box { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+        .save-load-zone { margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: flex; flex-wrap: wrap; justify-content: center; }
+    </style>
+</head>
+<body>
+
+<div id="setup-screen" class="screen active">
+    <h1>מערכת החידונים הקהילתית 🏆</h1>
+    <button class="main-btn" onclick="initAdmin()">התחל חידון קיים (מנהל)</button>
+    <button class="main-btn" style="background: var(--blue);" onclick="show('creator-screen')">➕ צור / טען חידון חדש</button>
+    <div style="margin-top: 30px; border-top: 2px solid #ccc; width: 80%; padding-top: 20px;">
+        <input type="text" id="username" placeholder="השם שלך" style="padding:10px; margin:5px;"><br>
+        <input type="text" id="room-input" placeholder="קוד חדר" style="padding:10px; margin:5px;"><br>
+        <button class="main-btn" onclick="initUser()" style="background: var(--green);">הצטרף כשחקן</button>
+    </div>
+</div>
+
+<div id="creator-screen" class="screen">
+    <div class="creator-box">
+        <h2>ניהול תוכן החידון</h2>
+        
+        <div style="background: #f9f9f9; padding: 10px; border-radius: 10px;">
+            <h4>אפשרות 1: המרת PDF לשאלות</h4>
+            <input type="file" id="pdf-file" accept="application/pdf">
+            <button class="main-btn" onclick="processPDF()" style="font-size: 0.9rem;">חלץ שאלות מ-PDF</button>
+        </div>
+
+        <div class="save-load-zone">
+            <h4>אפשרות 2: שמירה וטעינה של חידון מוכן</h4>
+            <button class="main-btn" style="background: #444;" onclick="downloadQuiz()">💾 שמור חידון נוכחי למחשב</button>
+            <div style="margin-top: 10px;">
+                <label>טען קובץ חידון (.json):</label><br>
+                <input type="file" id="load-quiz-file" accept=".json" onchange="loadQuizFromFile(event)">
+            </div>
+        </div>
+        
+        <hr>
+        <button class="main-btn" onclick="initAdmin()" style="background: var(--green);">סיימתי, התחל משחק!</button>
+        <button class="main-btn" style="background: #666;" onclick="show('setup-screen')">חזור</button>
+    </div>
+</div>
+
+<div id="admin-screen" class="screen">
+    <div id="room-code">מתחבר...</div>
+    <div id="admin-q" style="font-size: 2rem; font-weight: bold; margin: 20px;"></div>
+    <div class="admin-grid" id="admin-opts"></div>
+    <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 30px;">שאלה הבאה</button>
+</div>
+
+<div id="user-screen" class="screen">
+    <div id="u-status" style="font-size: 1.5rem;">ממתין...</div>
+    <div class="user-grid" id="u-ctrl" style="display:none;">
+        <button class="user-btn btn-red" onclick="sendAns(0)"></button>
+        <button class="user-btn btn-blue" onclick="sendAns(1)"></button>
+        <button class="user-btn btn-yellow" onclick="sendAns(2)"></button>
+        <button class="user-btn btn-green" onclick="sendAns(3)"></button>
+    </div>
+</div>
+
+<div id="leaderboard-screen" class="screen">
+    <h1>🏆 תוצאות</h1>
+    <table id="leaderboard-table" style="width: 80%; margin: auto; background: white;">
+        <thead><tr><th>שם</th><th>ניקוד</th></tr></thead>
+        <tbody id="leaderboard-body"></tbody>
+    </table>
+    <button class="main-btn" onclick="location.reload()">סגור</button>
+</div>
+
+<script>
+    // שאלות ברירת מחדל
+    let quiz = [
+        { q: "מי יודע שישה?", a: ["בראשית", "אבות", "תורה", "סדרי משנה"], c: 3 },
+        { q: "מיהי שעמדה?", a: ["ציפורה", "מצווה", "ההבטחה", "זרוע"], c: 2 }
+    ];
+
+    let peer, conn, current = -1, players = {};
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+    // פונקציית שמירה: מורידה קובץ JSON
+    function downloadQuiz() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quiz));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "my_quiz.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    // פונקציית טעינה: קוראת קובץ JSON מהמחשב
+    function loadQuizFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                quiz = JSON.parse(e.target.result);
+                alert("החידון נטען בהצלחה! " + quiz.length + " שאלות מוכנות.");
+            } catch (err) {
+                alert("שגיאה בטעינת הקובץ. וודא שזה קובץ חידון תקין.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // חילוץ מ-PDF (אלגוריתם בסיסי)
+    async function processPDF() {
+        const file = document.getElementById('pdf-file').files[0];
+        if (!file) return alert("בחר PDF");
+        const reader = new FileReader();
+        reader.onload = async function() {
+            const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+            let text = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(item => item.str).join(" ") + "\n";
+            }
+            const lines = text.split(/[?!.]/).filter(l => l.trim().length > 5);
+            quiz = lines.map(l => ({ q: l.trim() + "?", a: ["א'","ב'","ג'","ד'"], c: 0 }));
+            alert("חולצו " + quiz.length + " שאלות. מומלץ לשמור את החידון כעת.");
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // לוגיקת משחק (קוצר למען הבהירות)
+    function initAdmin() {
+        const shortId = Math.random().toString(36).substr(2, 5).toUpperCase();
+        peer = new Peer(shortId);
+        peer.on('open', id => { document.getElementById('room-code').innerText = "קוד: " + id; show('admin-screen'); });
+        peer.on('connection', c => {
+            c.on('data', d => {
+                if(d.type === 'join') { players[c.peer] = { name: d.name, score: 0, conn: c }; document.getElementById('p-count').innerText = "משתתפים: " + Object.keys(players).length; }
+                if(d.type === 'ans' && d.v === quiz[current].c) players[c.peer].score += 100;
+            });
+        });
+    }
+
+    function initUser() {
+        const name = document.getElementById('username').value, code = document.getElementById('room-input').value.toUpperCase();
+        peer = new Peer();
+        peer.on('open', () => {
+            conn = peer.connect(code);
+            conn.on('open', () => { conn.send({type: 'join', name: name}); show('user-screen'); });
+            conn.on('data', d => {
+                if(d.type === 'next') { document.getElementById('u-ctrl').style.display = 'grid'; document.getElementById('u-status').innerText = "ענה!"; }
+                if(d.type === 'end') renderTable(d.data);
+            });
+        });
+    }
+
+    function nextQ() {
+        current++;
+        if(current >= quiz.length) {
+            const scores = Object.values(players).map(p => ({name: p.name, score: p.score})).sort((a,b) => b.score - a.score);
+            Object.values(players).forEach(p => p.conn.send({type: 'end', data: scores}));
+            renderTable(scores); return;
+        }
+        document.getElementById('admin-q').innerText = quiz[current].q;
+        const ui = document.getElementById('admin-opts'); ui.innerHTML = "";
+        ['btn-red','btn-blue','btn-yellow','btn-green'].forEach((c,i) => ui.innerHTML += `<div class="admin-opt ${c}">${quiz[current].a[i]}</div>`);
+        Object.values(players).forEach(p => p.conn.send({type: 'next'}));
+    }
+
+    function renderTable(data) {
+        show('leaderboard-screen');
+        const b = document.getElementById('leaderboard-body'); b.innerHTML = "";
+        data.forEach(p => b.innerHTML += `<tr><td>${p.name}</td><td>${p.score}</td></tr>`);
+    }
+
+    function sendAns(v) { conn.send({type: 'ans', v: v}); document.getElementById('u-ctrl').style.display = 'none'; }
+    function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+</script>
+</body>
+</html>
