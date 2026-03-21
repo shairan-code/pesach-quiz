@@ -2,162 +2,128 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>חידון פסח קהילתי - גרסה מלאה</title>
+    <title>חידון פסח קהילתי - חטיבה</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --red: #e21b3c; --blue: #1368ce; --yellow: #d89e00; --green: #26890c; --purple: #46178f; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f2f2f2; text-align: center; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f2f2f2; overflow-x: hidden; }
         .screen { display: none; padding: 20px; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; }
         .active { display: flex; }
-        
-        /* עיצוב מנהל */
-        #admin-question { font-size: 2.5rem; font-weight: bold; margin: 20px; color: #333; }
-        .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 90%; max-width: 1000px; }
+        .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 90%; max-width: 1000px; margin-top: 20px; }
         .admin-opt { padding: 40px; color: white; font-size: 1.8rem; border-radius: 15px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        
-        /* עיצוב משתמש */
         .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: 70vh; margin-top: 20px; }
         .user-btn { border: none; border-radius: 20px; cursor: pointer; box-shadow: 0 6px 0 rgba(0,0,0,0.2); }
         .user-btn:active { transform: translateY(4px); box-shadow: none; }
-        
-        /* כללי */
         button.main-btn { padding: 15px 30px; font-size: 1.2rem; background: var(--purple); color: white; border: none; border-radius: 10px; cursor: pointer; }
         .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
         .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
-        #room-id-display { background: white; padding: 10px 20px; border-radius: 50px; font-size: 1.5rem; color: var(--purple); font-weight: bold; margin-bottom: 20px; }
+        #room-code { background: white; padding: 10px 25px; border-radius: 50px; font-size: 2rem; color: var(--purple); font-weight: bold; border: 3px solid var(--purple); margin: 15px; }
     </style>
 </head>
 <body>
 
 <div id="setup-screen" class="screen active">
     <h1>חידון פסח הקהילתי 🍷</h1>
-    <div style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
-        <button class="main-btn" onclick="startAsAdmin()">אני המנהל (הצג על מסך)</button>
-        <hr style="margin: 30px 0;">
+    <p>בחרו תפקיד כדי להתחיל:</p>
+    <button class="main-btn" onclick="initAdmin()">אני המנהל (מציג שאלות)</button>
+    <div style="margin-top: 40px; border-top: 2px solid #ccc; pt: 20px; width: 80%;">
         <h3>כניסת משתתף:</h3>
-        <input type="text" id="username" placeholder="השם שלך" style="padding:10px; width: 80%; margin-bottom:10px;"><br>
-        <input type="text" id="room-input" placeholder="קוד חדר מהמסך" style="padding:10px; width: 80%; margin-bottom:10px;"><br>
-        <button class="main-btn" onclick="joinAsUser()" style="background: var(--green);">הצטרף למשחק</button>
+        <input type="text" id="username" placeholder="השם שלך" style="padding:10px; margin:5px; width:200px;"><br>
+        <input type="text" id="room-input" placeholder="קוד חדר מהמנהל" style="padding:10px; margin:5px; width:200px;"><br>
+        <button class="main-btn" onclick="initUser()" style="background: var(--green);">הצטרף למשחק</button>
     </div>
 </div>
 
 <div id="admin-screen" class="screen">
-    <div id="room-id-display">טוען קוד חדר...</div>
-    <div id="admin-question">ממתין להתחלה...</div>
-    <div class="admin-grid" id="admin-options-ui"></div>
-    <div id="stats" style="margin-top:20px; font-size:1.2rem;">משתתפים: <span id="p-count">0</span></div>
-    <button id="next-btn" class="main-btn" onclick="sendNextQuestion()" style="margin-top:30px;">התחל / שאלה הבאה</button>
+    <div id="room-code">מתחבר...</div>
+    <div id="admin-q" style="font-size: 2.5rem; font-weight: bold; margin: 20px;"></div>
+    <div class="admin-grid" id="admin-opts"></div>
+    <div id="p-count" style="margin-top: 20px; font-size: 1.2rem;">משתתפים: 0</div>
+    <button class="main-btn" onclick="nextQ()" style="margin-top: 30px;">שאלה הבאה</button>
 </div>
 
 <div id="user-screen" class="screen">
-    <div id="user-info" style="font-size:1.5rem; margin-bottom:10px;"></div>
-    <div id="user-status" style="font-size:1.2rem; font-weight:bold;">ממתין למנהל...</div>
-    <div class="user-grid" id="controller" style="display:none;">
-        <button class="user-btn btn-red" onclick="submitAnswer(0)"></button>
-        <button class="user-btn btn-blue" onclick="submitAnswer(1)"></button>
-        <button class="user-btn btn-yellow" onclick="submitAnswer(2)"></button>
-        <button class="user-btn btn-green" onclick="submitAnswer(3)"></button>
+    <div id="u-status" style="font-size: 1.5rem; font-weight: bold;">ממתין למנהל...</div>
+    <div class="user-grid" id="u-ctrl" style="display:none;">
+        <button class="user-btn btn-red" onclick="sendAns(0)"></button>
+        <button class="user-btn btn-blue" onclick="sendAns(1)"></button>
+        <button class="user-btn btn-yellow" onclick="sendAns(2)"></button>
+        <button class="user-btn btn-green" onclick="sendAns(3)"></button>
     </div>
 </div>
 
 <script>
-    // מאגר השאלות המלא מהקובץ
-    const questions = [
-        { q: "שישה בשיר אחד מי יודע?", a: ["ימי בראשית", "אבות", "חומשי תורה", "סדרי משנה"], c: 3 }, [cite: 84, 88]
-        { q: "מיהי שעמדה לאבותינו ולנו?", a: ["ציפורה", "המצווה לזכור", "ההבטחה שאלוקים שומר על ישראל", "הזרוע הנטויה"], c: 2 }, [cite: 89, 90]
-        { q: "כמה פעמים מופיע משה רבנו בהגדה?", a: ["3 פעמים", "פעם אחת בלבד", "47 פעמים", "20 פעמים"], c: 1 }, [cite: 94, 96]
-        { q: "מצה זו שאנו אוכלים על שום מה?", a: ["שום ופלפל", "הרעב במצרים", "שלא הספיק בצקם להחמיץ", "איסור חמץ"], c: 2 }, [cite: 99, 102]
-        { q: "מהי התשובה הנכונה לשאלה 'מה נשתנה'?", a: ["שותים 4 כוסות", "כולו מצה", "כולו מרור", "כל התשובות נכונות"], c: 3 }, [cite: 104, 108]
-        { q: "למה טובלים את הכרפס במי מלח?", a: ["להזכיר דמעות עבדות", "לסמל את הים", "להוסיף טעם", "לשמור מסורת"], c: 0 }, [cite: 109, 110]
-        { q: "הקשר בין הזרוע והביצה בקערה:", a: ["מרירות העבדות", "זכר לקורבן פסח וחגיגה", "סימול הטיט", "קישוט בלבד"], c: 1 }, [cite: 114, 116]
-        { q: "עבדים היינו לפרעה ב___", a: ["ירושלים", "בבל", "כנען", "מצרים"], c: 3 }, [cite: 122, 126]
-        { q: "מה בנו בני ישראל בעיר רעמסס?", a: ["גשרים", "בתי כנסת", "ערי מסכנות ומחסנים", "פארקים"], c: 2 }, [cite: 127, 130]
-        { q: "מה שרו בני ישראל לאחר שעברו את הים?", a: ["תהילים", "שירת הים", "שיר השירים", "מגילת רות"], c: 1 }, [cite: 137, 139]
-        { q: "לכבוד מי מניחים כוס נוספת?", a: ["משה", "אהרן", "אליהו הנביא", "אלוקים"], c: 2 }, [cite: 142, 145]
-        { q: "כמה ספרים יש בתורה?", a: ["1", "3", "4", "5"], c: 3 }, [cite: 152, 156]
-        { q: "מה עשו בני ישראל כשמשה היה בהר?", a: ["שרו ורקדו", "בנו עגל זהב", "ישנו", "הכינו סעודה"], c: 1 }, [cite: 157, 159]
-        { q: "כמה דיברות קיבל משה בהר סיני?", a: ["12", "10", "8", "6"], c: 1 }, [cite: 167, 169]
-        { q: "חד גדיא: מי אכל את הגדי?", a: ["הכלב", "האריה", "הנחש", "החתול"], c: 3 }, [cite: 172, 176]
-        { q: "מה מרחו בני ישראל על המשקוף?", a: ["שמן זית", "יין", "מים", "דם"], c: 3 }, [cite: 177, 181]
-        { q: "מה קוראים בבית הכנסת בפסח?", a: ["קהלת", "מגילת אסתר", "שיר השירים", "מגילת רות"], c: 2 }, [cite: 182, 185]
-        { q: "מי הם ארבעת הבנים?", a: ["חכם, רשע, תם, שאינו יודע לשאול", "חכם, תלמיד, שואל, שקט", "חכם, תם, לומד, מרדני", "חכם, שואל, קטן, תם"], c: 0 }, [cite: 187, 188]
-        { q: "איזה חלק מוקדש לסיפור יציאת מצרים?", a: ["נרחץ", "נשתה", "מגיד", "שולחן עורך"], c: 2 }, [cite: 192, 195]
-        { q: "כמה שלבים יש בסדר ליל הסדר?", a: ["10", "12", "15", "18"], c: 2 }, [cite: 197, 200]
-        { q: "מה הם עשרת המכות (בסדר הנכון)?", a: ["דם, צפרדע... מגפה", "צפרדע... שלג", "דם... סערה", "דם, צפרדע, כינים, ערוב, דבר, שחין, ברד, ארבה, חושך, בכורות"], c: 3 } [cite: 202, 206]
+    // השאלות מהקבצים שהעלית 
+    const quiz = [
+        { q: "מי יודע שישה בשיר אחד מי יודע?", a: ["ימי בראשית", "אבות", "חומשי תורה", "שישה סדרי משנה"], c: 3 },
+        { q: "מיהי שעמדה לאבותינו ולנו?", a: ["ציפורה", "מצווה לזכור", "ההבטחה שאלוקים שומר על ישראל", "הזרוע הנטויה"], c: 2 },
+        { q: "כמה פעמים מופיע משה רבנו בהגדה?", a: ["3 פעמים", "פעם אחת בלבד", "47 פעמים", "20 פעמים"], c: 1 },
+        { q: "מצה זו שאנו אוכלים על שום מה?", a: ["שום ופלפל", "הרעב במצרים", "לא הספיק בצקם להחמיץ", "איסור חמץ"], c: 2 },
+        { q: "מה בנו בני ישראל בעיר רעמסס?", a: ["גשרים", "בתי כנסת", "ערי מסכנות ומחסנים", "פארקים"], c: 2 },
+        { q: "מה שרו בני ישראל לאחר שעברו את הים?", a: ["תהילים", "שירת הים", "שיר השירים", "מגילת רות"], c: 1 },
+        { q: "מי הם ארבעת הבנים?", a: ["חכם, רשע, תם, שאינו יודע לשאול", "חכם, תלמיד, שואל, שקט", "חכם, תם, לומד, מרדני", "חכם, שואל, קטן, תם"], c: 0 },
+        { q: "כמה שלבים יש בסדר ליל הסדר?", a: ["10", "12", "15", "18"], c: 2 },
+        { q: "מה הם עשרת המכות (בסדר הנכון)?", a: ["דם, צפרדע... מגפה", "צפרדע... שלג", "דם... סערה", "דם, צפרדע, כינים, ערוב, דבר, שחין, ברד, ארבה, חושך, בכורות"], c: 3 }
     ];
 
-    let peer, conn, roomID;
-    let currentQIndex = -1;
-    let players = {};
+    let peer, conn, current = -1, players = {};
 
-    function startAsAdmin() {
+    function initAdmin() {
         peer = new Peer();
         peer.on('open', id => {
-            roomID = id.substring(0, 5).toUpperCase();
-            document.getElementById('room-id-display').innerText = "קוד חדר: " + roomID;
-            switchScreen('admin-screen');
+            document.getElementById('room-code').innerText = "קוד חדר: " + id;
+            show('admin-screen');
         });
         peer.on('connection', c => {
-            c.on('data', data => {
-                if(data.type === 'join') {
-                    players[c.peer] = { name: data.name, connection: c, score: 0 };
-                    document.getElementById('p-count').innerText = Object.keys(players).length;
+            c.on('data', d => {
+                if(d.type === 'join') {
+                    players[c.peer] = { name: d.name, conn: c, score: 0 };
+                    document.getElementById('p-count').innerText = "משתתפים: " + Object.keys(players).length;
                 }
-                if(data.type === 'answer') {
-                    if(data.ans === questions[currentQIndex].c) players[c.peer].score += 100;
-                }
+                if(d.type === 'ans' && d.v === quiz[current].c) players[c.peer].score += 100;
             });
         });
     }
 
-    function joinAsUser() {
+    function initUser() {
         const name = document.getElementById('username').value;
-        const code = document.getElementById('room-input').value.toUpperCase();
+        const code = document.getElementById('room-input').value;
         if(!name || !code) return alert("מלא שם וקוד!");
-        
         peer = new Peer();
         peer.on('open', () => {
-            // ב-PeerJS נצטרך שהמנהל יספק את ה-ID המלא שלו (לצורך הפשטות כאן זה דורש התאמה של ה-ID)
-            // הערה: בגרסת ייצור מלאה ה-Room ID מקושר ל-Peer ID המלא בשרת.
-            conn = peer.connect(code); 
+            conn = peer.connect(code);
             conn.on('open', () => {
-                conn.send({ type: 'join', name: name });
-                document.getElementById('user-info').innerText = "שלום, " + name;
-                switchScreen('user-screen');
+                conn.send({type: 'join', name: name});
+                show('user-screen');
             });
-            conn.on('data', data => {
-                if(data.type === 'next') {
-                    document.getElementById('controller').style.display = 'grid';
-                    document.getElementById('user-status').innerText = "ענה עכשיו!";
+            conn.on('data', d => {
+                if(d.type === 'next') {
+                    document.getElementById('u-ctrl').style.display = 'grid';
+                    document.getElementById('u-status').innerText = "בחר צבע!";
                 }
             });
         });
     }
 
-    function sendNextQuestion() {
-        currentQIndex++;
-        if(currentQIndex >= questions.length) {
-            alert("החידון הסתיים!");
-            return;
-        }
-        const q = questions[currentQIndex];
-        document.getElementById('admin-question').innerText = q.q;
-        const ui = document.getElementById('admin-options-ui');
+    function nextQ() {
+        current++;
+        if(current >= quiz.length) return alert("סוף החידון!");
+        const q = quiz[current];
+        document.getElementById('admin-q').innerText = q.q;
+        const ui = document.getElementById('admin-opts');
         ui.innerHTML = "";
         const colors = ['btn-red', 'btn-blue', 'btn-yellow', 'btn-green'];
-        q.a.forEach((txt, i) => {
-            ui.innerHTML += `<div class="admin-opt ${colors[i]}">${txt}</div>`;
-        });
-        Object.values(players).forEach(p => p.connection.send({ type: 'next' }));
+        q.a.forEach((t, i) => ui.innerHTML += `<div class="admin-opt ${colors[i]}">${t}</div>`);
+        Object.values(players).forEach(p => p.conn.send({type: 'next'}));
     }
 
-    function submitAnswer(idx) {
-        conn.send({ type: 'answer', ans: idx });
-        document.getElementById('controller').style.display = 'none';
-        document.getElementById('user-status').innerText = "תשובה נשלחה! המתן...";
+    function sendAns(i) {
+        conn.send({type: 'ans', v: i});
+        document.getElementById('u-ctrl').style.display = 'none';
+        document.getElementById('u-status').innerText = "נשלח! המתן למנהל...";
     }
 
-    function switchScreen(id) {
+    function show(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
     }
