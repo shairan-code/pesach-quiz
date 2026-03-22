@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>מערכת קאנוט - ניהול הצבעה</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
+        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        .timer { font-size: 48px; color: #e74c3c; font-weight: bold; margin: 20px 0; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .option { padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 18px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        canvas { max-width: 100%; margin-top: 20px; }
+        .summary-section { margin-top: 40px; border-top: 2px solid #ddd; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>שאלת טריוויה</h1>
+    <h2 id="question-text">מהי בירת צרפת?</h2>
+    
+    <div class="timer" id="timer">15</div>
+    
+    <div class="options-grid">
+        <div class="option" id="opt1">א: פריז</div>
+        <div class="option" id="opt2">ב: לונדון</div>
+        <div class="option" id="opt3">ג: רומא</div>
+        <div class="option" id="opt4">ד: ברלין</div>
+    </div>
+
+    <button id="start-btn" onclick="startVoting()">הפעל שעון 15 שניות</button>
+    <button id="analyze-btn" onclick="analyzeResults()" disabled>נתח תוצאות</button>
+
+    <div id="chart-container" style="display:none;">
+        <canvas id="currentChart"></canvas>
+    </div>
+</div>
+
+<div class="card summary-section">
+    <h3>📈 סיכום הצבעות מצטבר</h3>
+    <canvas id="historyChart"></canvas>
+    <p id="total-accuracy">אחוז דיוק כללי: 0%</p>
+</div>
+
+<script>
+    let timeLeft = 15;
+    let timerInterval;
+    let historyData = []; // שומר את אחוזי הדיוק מכל שאלה
+
+    // שעון עצר
+    function startVoting() {
+        document.getElementById('start-btn').disabled = true;
+        timeLeft = 15;
+        document.getElementById('timer').innerText = timeLeft;
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('timer').innerText = "הזמן נגמר!";
+                document.getElementById('analyze-btn').disabled = false;
+            }
+        }, 1000);
+    }
+
+    // ניתוח תוצאות (סימולציה של נתונים)
+    function analyzeResults() {
+        // בגרסה אמיתית הנתונים יגיעו מהשרת, כאן נגריל מספרים להדגמה
+        const votes = [Math.floor(Math.random()*50)+10, Math.floor(Math.random()*20), Math.floor(Math.random()*20), Math.floor(Math.random()*20)];
+        const total = votes.reduce((a, b) => a + b, 0);
+        const accuracy = Math.round((votes[0] / total) * 100);
+        
+        historyData.push(accuracy);
+        showCurrentChart(votes);
+        updateHistoryChart();
+        
+        document.getElementById('chart-container').style.display = 'block';
+        document.getElementById('total-accuracy').innerText = `אחוז דיוק כללי: ${Math.round(historyData.reduce((a,b)=>a+b,0)/historyData.length)}%`;
+    }
+
+    // גרף שאלה נוכחית
+    function showCurrentChart(data) {
+        const ctx = document.getElementById('currentChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['א (נכון)', 'ב', 'ג', 'ד'],
+                datasets: [{
+                    label: 'מספר מצביעים',
+                    data: data,
+                    backgroundColor: ['#2ecc71', '#e74c3c', '#e74c3c', '#e74c3c']
+                }]
+            }
+        });
+    }
+
+    // גרף היסטוריה מצטבר
+    let historyChartInstance;
+    function updateHistoryChart() {
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        if (historyChartInstance) historyChartInstance.destroy();
+        
+        historyChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: historyData.map((_, i) => `שאלה ${i+1}`),
+                datasets: [{
+                    label: 'אחוז דיוק (%)',
+                    data: historyData,
+                    borderColor: '#3498db',
+                    fill: false
+                }]
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
