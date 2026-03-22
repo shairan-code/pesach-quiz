@@ -5,7 +5,6 @@
     <title>חידון פסח הקהילתי - Smart Quiz</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --red: #e21b3c; --blue: #1368ce; --yellow: #d89e00; --green: #26890c; --purple: #46178f; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f2f2f2; text-align: center; overflow-x: hidden; }
@@ -13,7 +12,11 @@
         .active { display: flex; }
         .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 95%; max-width: 1000px; }
         .admin-opt { padding: 30px; color: white; font-size: 1.5rem; border-radius: 15px; font-weight: bold; transition: 0.4s; border: 6px solid transparent; }
-        .correct-anim { border-color: gold; transform: scale(1.1); box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); z-index: 10; }
+        
+        /* הבלטת תשובות בסיום */
+        .correct-anim { border-color: gold; transform: scale(1.05); box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); z-index: 10; }
+        .fade-out { opacity: 0.3; transform: scale(0.95); }
+
         .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: 60vh; }
         .user-btn { border: none; border-radius: 20px; cursor: pointer; transition: 0.2s; }
         .user-btn:active { transform: scale(0.9); }
@@ -21,8 +24,11 @@
         #room-code { background: white; padding: 10px 25px; border-radius: 50px; font-size: 1.8rem; color: var(--purple); font-weight: bold; border: 3px solid var(--purple); }
         .qr-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 10px; display: inline-block; }
         .timer { font-size: 5rem; font-weight: bold; color: var(--red); margin: 10px; transition: 0.3s; }
-        .leader-toast { background: #333; color: gold; padding: 15px 30px; border-radius: 50px; margin-top: 20px; font-size: 1.5rem; display: none; border: 2px solid gold; animation: slideUp 0.5s ease; }
+        
+        /* כרטיסיית התוצאות החדשה */
+        .results-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-top: 25px; width: 90%; max-width: 800px; animation: slideUp 0.5s ease; border: 4px solid var(--green); display: none; }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
         .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
         .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
     </style>
@@ -46,7 +52,7 @@
         <div id="qr-admin"></div>
         <div>
             <div id="room-code">טוען...</div>
-            <div id="p-count" style="margin-top:5px;">משתתפים: 0</div>
+            <div id="p-count" style="margin-top:5px; font-size:1.2rem; font-weight:bold;">משתתפים: 0</div>
         </div>
         <div id="timer-display" class="timer">30</div>
     </div>
@@ -54,7 +60,15 @@
     <div id="admin-q" style="font-size: 2.8rem; font-weight: bold; margin-bottom: 30px; color: #222;"></div>
     <div class="admin-grid" id="admin-opts"></div>
     
-    <div id="leader-info" class="leader-toast">🏆 מוביל כרגע: <span id="top-player-name">-</span></div>
+    <div id="round-results" class="results-card">
+        <h2 style="margin-top:0;">✨ התשובה הנכונה: <br><span id="correct-text" style="color:var(--green); font-size: 2rem;"></span></h2>
+        <div style="margin: 20px 0; font-size: 1.4rem; background: #f9f9f9; padding: 15px; border-radius: 10px;">
+            <strong>✅ ענו נכון:</strong> <span id="correct-players" style="color: var(--blue);"></span>
+        </div>
+        <div style="font-size: 1.6rem; color: gold; background: #333; padding: 15px; border-radius: 10px;">
+            <strong>🏆 מוביל/ה כרגע:</strong> <span id="current-leader"></span>
+        </div>
+    </div>
 
     <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 40px; padding: 20px 60px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל / שאלה הבאה ➡️</button>
 </div>
@@ -72,7 +86,6 @@
 <script>
     const SITE_URL = "https://shairan-code.github.io/pesach-quiz/";
     
-    // מאגר השאלות המעודכן
     let quiz = [
         { q: "מי יודע שישה בשיר אחד מי יודע?", a: ["שישה ימי בראשית", "שישה אבות", "שישה חומשי תורה", "שישה סדרי משנה"], c: 3 },
         { q: "מיהי שעמדה לאבותינו ולנו?", a: ["ההבטחה שאלוקים שומר על ישראל", "ציפורה עמדה", "המצווה לזכור את יציאת מצרים", "הזרוע הנטויה שבה הוציא הקב“ה את ישראל ממצרים"], c: 0 },
@@ -124,19 +137,34 @@
         });
         peer.on('connection', c => {
             c.on('data', d => {
-                if(d.type === 'join') { players[c.peer] = { name: d.name, score: 0, conn: c }; updatePCount(); }
-                if(d.type === 'ans' && d.v === quiz[current].c) players[c.peer].score += 100;
+                if(d.type === 'join') { 
+                    players[c.peer] = { name: d.name, score: 0, conn: c, lastCorrect: false }; 
+                    updatePCount(); 
+                }
+                if(d.type === 'ans') {
+                    // בדיקה האם התשובה נכונה
+                    if(d.v === quiz[current].c) {
+                        players[c.peer].score += 100;
+                        players[c.peer].lastCorrect = true; // סימון שענה נכון בסיבוב הזה
+                    } else {
+                        players[c.peer].lastCorrect = false;
+                    }
+                }
             });
         });
     }
 
     function nextQ() {
         current++;
-        if(current >= quiz.length) return alert("המשחק הסתיים! בדוק את הלוח הסופי.");
+        if(current >= quiz.length) return alert("המשחק הסתיים! כל הכבוד לכל המשתתפים.");
+        
+        // איפוס נתוני הסיבוב הקודם
+        Object.values(players).forEach(p => p.lastCorrect = false);
+        document.getElementById('round-results').style.display = 'none';
         
         document.getElementById('admin-q').innerText = quiz[current].q;
-        document.getElementById('leader-info').style.display = 'none';
-        const ui = document.getElementById('admin-opts'); ui.innerHTML = "";
+        const ui = document.getElementById('admin-opts'); 
+        ui.innerHTML = "";
         ['btn-red','btn-blue','btn-yellow','btn-green'].forEach((c,i) => {
             if(quiz[current].a[i]) ui.innerHTML += `<div id="opt-${i}" class="admin-opt ${c}">${quiz[current].a[i]}</div>`;
         });
@@ -164,15 +192,49 @@
     function revealAnswer() {
         Object.values(players).forEach(p => p.conn.send({type: 'stop'}));
         const correctIdx = quiz[current].c;
-        document.getElementById(`opt-${correctIdx}`).classList.add('correct-anim');
         document.getElementById('timer-display').innerText = "⌛";
 
-        const pArray = Object.values(players);
-        if(pArray.length > 0) {
-            const topPlayer = pArray.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
-            document.getElementById('top-player-name').innerText = `${topPlayer.name} (${topPlayer.score} נק')`;
-            document.getElementById('leader-info').style.display = 'block';
+        // עיצוב התשובות (הדגשת הנכונה ודהייה של השגויות)
+        for(let i=0; i<4; i++) {
+            const optElement = document.getElementById(`opt-${i}`);
+            if(optElement) {
+                if(i === correctIdx) {
+                    optElement.classList.add('correct-anim');
+                } else {
+                    optElement.classList.add('fade-out');
+                }
+            }
         }
+
+        // הכנת המידע לכרטיסיית התוצאות
+        const correctText = quiz[current].a[correctIdx];
+        document.getElementById('correct-text').innerText = correctText;
+
+        // מי ענה נכון
+        const correctPlayersNames = Object.values(players)
+            .filter(p => p.lastCorrect)
+            .map(p => p.name);
+            
+        if(correctPlayersNames.length > 0) {
+            document.getElementById('correct-players').innerText = correctPlayersNames.join(' | ');
+        } else {
+            document.getElementById('correct-players').innerText = "אף אחד לא ענה נכון הפעם 😢";
+        }
+
+        // מי מוביל בניקוד הכללי
+        const pArray = Object.values(players);
+        let leaderText = "טרם נקבע";
+        if(pArray.length > 0) {
+            const highestScore = Math.max(...pArray.map(p => p.score));
+            if(highestScore > 0) {
+                const leaders = pArray.filter(p => p.score === highestScore).map(p => p.name);
+                leaderText = `${leaders.join(', ')} (${highestScore} נקודות)`;
+            }
+        }
+        document.getElementById('current-leader').innerText = leaderText;
+
+        // הצגת כרטיסיית התוצאות
+        document.getElementById('round-results').style.display = 'block';
     }
 
     function initUser() {
