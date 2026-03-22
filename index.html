@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>חידון פסח הקהילתי - Smart Quiz</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --red: #e21b3c; --blue: #1368ce; --yellow: #d89e00; --green: #26890c; --purple: #46178f; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f2f2f2; text-align: center; overflow-x: hidden; }
+        .screen { display: none; padding: 20px; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+        .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 95%; max-width: 1000px; }
+        .admin-opt { padding: 30px; color: white; font-size: 1.5rem; border-radius: 15px; font-weight: bold; transition: 0.4s; border: 6px solid transparent; }
+        .correct-anim { border-color: gold; transform: scale(1.1); box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); z-index: 10; }
+        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: 60vh; }
+        .user-btn { border: none; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+        .user-btn:active { transform: scale(0.9); }
+        button.main-btn { padding: 12px 25px; font-size: 1.1rem; background: var(--purple); color: white; border: none; border-radius: 10px; cursor: pointer; margin: 5px; }
+        #room-code { background: white; padding: 10px 25px; border-radius: 50px; font-size: 1.8rem; color: var(--purple); font-weight: bold; border: 3px solid var(--purple); }
+        .qr-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 10px; display: inline-block; }
+        .timer { font-size: 5rem; font-weight: bold; color: var(--red); margin: 10px; transition: 0.3s; }
+        .leader-toast { background: #333; color: gold; padding: 15px 30px; border-radius: 50px; margin-top: 20px; font-size: 1.5rem; display: none; border: 2px solid gold; animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
+        .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
+    </style>
+</head>
+<body>
+
+<div id="setup-screen" class="screen active">
+    <h1>חידון פסח הקהילתי 🍷</h1>
+    <div class="qr-container"><div id="qr-home"></div></div>
+    <button class="main-btn" onclick="initAdmin()">אני המנהל (הקרנה)</button>
+    <div style="margin-top: 20px; background: white; padding: 20px; border-radius: 15px;">
+        <h3>כניסת שחקן</h3>
+        <input type="text" id="username" placeholder="השם שלך" style="padding:10px; width: 80%;"><br>
+        <input type="text" id="room-input" placeholder="קוד חדר" style="padding:10px; margin-top:5px; width: 80%;"><br>
+        <button class="main-btn" onclick="initUser()" style="background: var(--green); width: 85%; margin-top: 10px;">הצטרף</button>
+    </div>
+</div>
+
+<div id="admin-screen" class="screen">
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 95%; background: white; padding: 15px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <div id="qr-admin"></div>
+        <div>
+            <div id="room-code">טוען...</div>
+            <div id="p-count" style="margin-top:5px;">משתתפים: 0</div>
+        </div>
+        <div id="timer-display" class="timer">30</div>
+    </div>
+
+    <div id="admin-q" style="font-size: 2.8rem; font-weight: bold; margin-bottom: 30px; color: #222;"></div>
+    <div class="admin-grid" id="admin-opts"></div>
+    
+    <div id="leader-info" class="leader-toast">🏆 מוביל כרגע: <span id="top-player-name">-</span></div>
+
+    <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 40px; padding: 20px 60px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל / שאלה הבאה ➡️</button>
+</div>
+
+<div id="user-screen" class="screen">
+    <div id="u-status" style="font-size: 2.2rem; font-weight: bold;">ממתין להתחלה...</div>
+    <div id="u-ctrl" class="user-grid" style="display:none;">
+        <button class="user-btn btn-red" onclick="sendAns(0)"></button>
+        <button class="user-btn btn-blue" onclick="sendAns(1)"></button>
+        <button class="user-btn btn-yellow" onclick="sendAns(2)"></button>
+        <button class="user-btn btn-green" onclick="sendAns(3)"></button>
+    </div>
+</div>
+
+<script>
+    const SITE_URL = "https://shairan-code.github.io/pesach-quiz/";
+    
+    // מאגר השאלות המעודכן
+    let quiz = [
+        { q: "מי יודע שישה בשיר אחד מי יודע?", a: ["שישה ימי בראשית", "שישה אבות", "שישה חומשי תורה", "שישה סדרי משנה"], c: 3 },
+        { q: "מיהי שעמדה לאבותינו ולנו?", a: ["ההבטחה שאלוקים שומר על ישראל", "ציפורה עמדה", "המצווה לזכור את יציאת מצרים", "הזרוע הנטויה שבה הוציא הקב“ה את ישראל ממצרים"], c: 0 },
+        { q: "כמה פעמים מופיע משה רבנו בהגדה?", a: ["שלוש פעמים", "פעם אחת בלבד", "47 פעמים", "20 פעמים"], c: 1 },
+        { q: "מצה זו שאנו אוכלים על שום מה?", a: ["על שום, פלפל ושמן זית", "על שום הרעב של אבותינו בארץ מצרים", "על שום שלא הספיק בצקם של אבותינו להחמיץ", "על שום איסור אכילת חמץ"], c: 2 },
+        { q: "מהי התשובה הנכונה לשאלה 'מה נשתנה'?", a: ["שבלילה הזה שותים ארבע כוסות", "שבלילה הזה כולו מצה", "שבלילה הזה כולו מרור", "כל התשובות נכונות"], c: 3 },
+        { q: "למה טובלים את הכרפס במי מלח?", a: ["כדי להזכיר את דמעות העבדות", "כדי לסמל את הים", "כדי להוסיף טעם", "כדי לשמור על המסורת"], c: 0 },
+        { q: "מדוע מונחים על הקערה גם הזרוע וגם הביצה, ומהו הקשר המשותף ביניהן?", a: ["שניהם מסמלים את המרירות של העבדות במצרים ואת הדמעות של בני ישראל", "שניהם מהווים זכר לקורבנות שהוקרבו בבית המקדש - קורבן הפסח וקורבן החגיגה", "שניהם מסמלים את הטיט ואת העבודה הקשה בבניית הפירמידות", "הם נועדו רק כדי לקשט את הקערה ולעורר את סקרנותם של הילדים בשולחן הסדר"], c: 1 },
+        { q: "הכרפס הוא ירק שמטרתו היחידה היא להזכיר לנו את עבודת הפרך במצרים?", a: ["False", "True"], c: 0 },
+        { q: "עבדים היינו לפרעה ב___", a: ["ירושלים", "בבל", "כנען", "מצרים"], c: 3 },
+        { q: "מה בנו בני ישראל בעיר רעמסס תחת עול השעבוד?", a: ["גשרים וכבישים", "בתי כנסת ובתי ספר", "ערי מסכנות ומחסנים", "גנים ופארקים"], c: 2 },
+        { q: "מה קרה לחיילי פרעה שנכנסו אחרי ישראל לתוך הים?", a: ["טבעו בתוך הים", "הפכו לדגים", "חזרו למצרים", "הפכו לנציב מלח"], c: 0 },
+        { q: "מה שרו בני ישראל לאחר שעברו את הים?", a: ["תהילים", "שירת הים", "שיר השירים", "מגילת רות"], c: 1 },
+        { q: "לכבוד מי מניחים כוס נוספת שלא שותים בליל הסדר?", a: ["לכבוד משה", "לכבוד אהרן", "לכבוד אליהו הנביא", "לכבוד אלוקים"], c: 2 },
+        { q: "מה פירוש המילה מן?", a: ["לחם שירד משמיים", "מים שירדו משמיים", "מים שיצאו מהסלע", "בשר משמיים"], c: 0 },
+        { q: "כמה ספרים יש בתורה?", a: ["1", "3", "4", "5"], c: 3 },
+        { q: "מה עשו בני ישראל בזמן שמשה היה בהר?", a: ["מאושר הם שרו ורקדו בלי הפסקה", "בנו עגל זהב", "ישנו מרוב עייפות", "הכינו סעודה לכבוד חזרתו של משה"], c: 1 },
+        { q: "מה שואל הילד הקטן בתחילת הסדר?", a: ["מתי אוכלים", "אחד מי יודע", "מה נשתנה הלילה הזה מכל הלילות", "חד גדיא"], c: 2 }
+    ];
+
+    let peer, conn, current = -1, players = {}, timerInterval;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    window.onload = () => {
+        new QRCode(document.getElementById("qr-home"), { text: SITE_URL, width: 140, height: 140 });
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('room')) document.getElementById('room-input').value = urlParams.get('room').toUpperCase();
+    };
+
+    function playSound(freq, type, duration) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function initAdmin() {
+        const id = Math.random().toString(36).substr(2, 5).toUpperCase();
+        peer = new Peer(id);
+        peer.on('open', (roomId) => {
+            document.getElementById('room-code').innerText = "חדר: " + roomId;
+            const smartLink = `${SITE_URL}?room=${roomId}`;
+            document.getElementById('qr-admin').innerHTML = "";
+            new QRCode(document.getElementById("qr-admin"), { text: smartLink, width: 100, height: 100 });
+            show('admin-screen');
+        });
+        peer.on('connection', c => {
+            c.on('data', d => {
+                if(d.type === 'join') { players[c.peer] = { name: d.name, score: 0, conn: c }; updatePCount(); }
+                if(d.type === 'ans' && d.v === quiz[current].c) players[c.peer].score += 100;
+            });
+        });
+    }
+
+    function nextQ() {
+        current++;
+        if(current >= quiz.length) return alert("המשחק הסתיים! בדוק את הלוח הסופי.");
+        
+        document.getElementById('admin-q').innerText = quiz[current].q;
+        document.getElementById('leader-info').style.display = 'none';
+        const ui = document.getElementById('admin-opts'); ui.innerHTML = "";
+        ['btn-red','btn-blue','btn-yellow','btn-green'].forEach((c,i) => {
+            if(quiz[current].a[i]) ui.innerHTML += `<div id="opt-${i}" class="admin-opt ${c}">${quiz[current].a[i]}</div>`;
+        });
+
+        let timeLeft = 30;
+        document.getElementById('timer-display').innerText = timeLeft;
+        document.getElementById('timer-display').style.color = "var(--red)";
+        Object.values(players).forEach(p => p.conn.send({type: 'next'}));
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer-display').innerText = timeLeft;
+            
+            if(timeLeft <= 5 && timeLeft > 0) playSound(440, 'sine', 0.1);
+            
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                playSound(150, 'sawtooth', 0.5); 
+                revealAnswer();
+            }
+        }, 1000);
+    }
+
+    function revealAnswer() {
+        Object.values(players).forEach(p => p.conn.send({type: 'stop'}));
+        const correctIdx = quiz[current].c;
+        document.getElementById(`opt-${correctIdx}`).classList.add('correct-anim');
+        document.getElementById('timer-display').innerText = "⌛";
+
+        const pArray = Object.values(players);
+        if(pArray.length > 0) {
+            const topPlayer = pArray.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
+            document.getElementById('top-player-name').innerText = `${topPlayer.name} (${topPlayer.score} נק')`;
+            document.getElementById('leader-info').style.display = 'block';
+        }
+    }
+
+    function initUser() {
+        const name = document.getElementById('username').value, code = document.getElementById('room-input').value.toUpperCase();
+        if(!name || !code) return alert("מלא פרטים!");
+        peer = new Peer();
+        peer.on('open', () => {
+            conn = peer.connect(code);
+            conn.on('open', () => { conn.send({type: 'join', name: name}); show('user-screen'); });
+            conn.on('data', d => {
+                if(d.type === 'next') { document.getElementById('u-ctrl').style.display = 'grid'; document.getElementById('u-status').innerText = "בחר מהר!"; }
+                if(d.type === 'stop') { document.getElementById('u-ctrl').style.display = 'none'; document.getElementById('u-status').innerText = "נגמר הזמן!"; }
+            });
+        });
+    }
+
+    function sendAns(v) { conn.send({type: 'ans', v: v}); document.getElementById('u-ctrl').style.display = 'none'; document.getElementById('u-status').innerText = "נשלח!"; }
+    function updatePCount() { document.getElementById('p-count').innerText = "משתתפים: " + Object.keys(players).length; }
+    function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+</script>
+</body>
+</html>
