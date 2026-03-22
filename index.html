@@ -27,6 +27,15 @@
         .results-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-top: 25px; width: 90%; max-width: 800px; animation: slideUp 0.5s ease; border: 4px solid var(--green); display: none; }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+        /* עיצוב טבלת התוצאות הסופית */
+        .leaderboard-table { width: 100%; max-width: 700px; border-collapse: collapse; margin: 20px auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .leaderboard-table th { background: var(--purple); color: white; padding: 15px; font-size: 1.5rem; }
+        .leaderboard-table td { padding: 15px; font-size: 1.3rem; border-bottom: 1px solid #eee; }
+        .leaderboard-table tr:last-child td { border-bottom: none; }
+        .leaderboard-table tr:nth-child(1) td { background: #fff8dc; font-weight: bold; font-size: 1.6rem; color: #b8860b; } /* מקום ראשון - זהב */
+        .leaderboard-table tr:nth-child(2) td { background: #f5f5f5; font-weight: bold; font-size: 1.4rem; color: #708090; } /* מקום שני - כסף */
+        .leaderboard-table tr:nth-child(3) td { background: #fff5ee; font-weight: bold; font-size: 1.4rem; color: #cd7f32; } /* מקום שלישי - ארד */
+
         .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
         .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
     </style>
@@ -81,6 +90,25 @@
     </div>
 </div>
 
+<div id="end-screen" class="screen">
+    <h1 style="font-size: 3rem; color: var(--purple); margin-bottom: 10px;">🏆 תוצאות סופיות 🏆</h1>
+    <h3 style="margin-top: 0; color: #555;">כל הכבוד לכל המשתתפים!</h3>
+    
+    <table class="leaderboard-table">
+        <thead>
+            <tr>
+                <th>מקום</th>
+                <th>שם משתתף</th>
+                <th>ניקוד</th>
+            </tr>
+        </thead>
+        <tbody id="final-tbody">
+            </tbody>
+    </table>
+    
+    <button id="restart-btn" class="main-btn" onclick="location.reload()" style="margin-top: 30px; font-size: 1.2rem; display: none;">משחק חדש 🔄</button>
+</div>
+
 <script>
     const SITE_URL = "https://shairan-code.github.io/pesach-quiz/";
     
@@ -113,7 +141,6 @@
         if (urlParams.has('room')) document.getElementById('room-input').value = urlParams.get('room').toUpperCase();
     };
 
-    // פונקציה להשמעת צפצוף בודד (לשניות האחרונות)
     function playSound(freq, type, duration) {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         const osc = audioCtx.createOscillator();
@@ -125,21 +152,19 @@
         osc.start(); osc.stop(audioCtx.currentTime + duration);
     }
 
-    // פונקציה להשמעת קול תרועה (Fanfare) בסגנון רטרו
     function playFanfare() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         const t = audioCtx.currentTime;
-        // תווים של אקורד דו מז'ור עולה כדי לתת תחושת ניצחון
         const notes = [261.63, 329.63, 392.00, 523.25]; 
         let timeOffset = 0;
         
         notes.forEach((freq, i) => {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'square'; // צליל שמזכיר קונסולות משחק ישנות
+            osc.type = 'square';
             osc.frequency.value = freq;
             
-            const duration = (i === notes.length - 1) ? 0.6 : 0.15; // התו האחרון ארוך יותר
+            const duration = (i === notes.length - 1) ? 0.6 : 0.15;
             gain.gain.setValueAtTime(0.1, t + timeOffset);
             gain.gain.exponentialRampToValueAtTime(0.01, t + timeOffset + duration);
             
@@ -151,7 +176,7 @@
     }
 
     function initAdmin() {
-        if(audioCtx.state === 'suspended') audioCtx.resume(); // שחרור חסימת שמע
+        if(audioCtx.state === 'suspended') audioCtx.resume();
         const id = Math.random().toString(36).substr(2, 5).toUpperCase();
         peer = new Peer(id);
         peer.on('open', (roomId) => {
@@ -182,7 +207,12 @@
     function nextQ() {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         current++;
-        if(current >= quiz.length) return alert("המשחק הסתיים! כל הכבוד לכל המשתתפים.");
+        
+        // בדיקה אם סיימנו את כל השאלות
+        if(current >= quiz.length) {
+            endGame();
+            return;
+        }
         
         Object.values(players).forEach(p => p.lastCorrect = false);
         document.getElementById('round-results').style.display = 'none';
@@ -194,7 +224,7 @@
             if(quiz[current].a[i]) ui.innerHTML += `<div id="opt-${i}" class="admin-opt ${c}">${quiz[current].a[i]}</div>`;
         });
 
-        let timeLeft = 20; // עדכנו ל-20 שניות
+        let timeLeft = 20;
         document.getElementById('timer-display').innerText = timeLeft;
         document.getElementById('timer-display').style.color = "var(--red)";
         Object.values(players).forEach(p => p.conn.send({type: 'next'}));
@@ -204,7 +234,6 @@
             timeLeft--;
             document.getElementById('timer-display').innerText = timeLeft;
             
-            // צפצופים ב-5 השניות האחרונות
             if(timeLeft <= 5 && timeLeft > 0) playSound(800, 'sine', 0.15); 
             
             if(timeLeft <= 0) {
@@ -219,7 +248,6 @@
         const correctIdx = quiz[current].c;
         document.getElementById('timer-display').innerText = "⌛";
 
-        // השמעת קול תרועת הניצחון
         playFanfare();
 
         for(let i=0; i<4; i++) {
@@ -260,6 +288,48 @@
         document.getElementById('round-results').style.display = 'block';
     }
 
+    // פונקציה חדשה לסיום המשחק
+    function endGame() {
+        // הכנת רשימת התוצאות ממוינת (מהגבוה לנמוך)
+        const sortedScores = Object.values(players)
+            .map(p => ({ name: p.name, score: p.score }))
+            .sort((a, b) => b.score - a.score);
+
+        // שליחת התוצאות לכל המשתתפים
+        Object.values(players).forEach(p => p.conn.send({ type: 'end', scores: sortedScores }));
+
+        // הצגת כפתור "משחק חדש" רק במסך המנהל
+        document.getElementById('restart-btn').style.display = 'inline-block';
+        
+        // יצירת הטבלה והצגת המסך
+        renderLeaderboard(sortedScores);
+        show('end-screen');
+    }
+
+    // פונקציה לבניית שורות הטבלה דינמית (משמשת גם מנהל וגם משתמש)
+    function renderLeaderboard(scoresData) {
+        const tbody = document.getElementById('final-tbody');
+        tbody.innerHTML = ''; // ניקוי טבלה קודמת
+
+        if (scoresData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3">אין משתתפים להצגה</td></tr>';
+            return;
+        }
+
+        scoresData.forEach((player, index) => {
+            // התאמת אייקון למקומות הראשונים
+            let placeObj = (index === 0) ? '🥇' : (index === 1) ? '🥈' : (index === 2) ? '🥉' : `${index + 1}`;
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${placeObj}</td>
+                    <td>${player.name}</td>
+                    <td>${player.score}</td>
+                </tr>
+            `;
+        });
+    }
+
     function initUser() {
         const name = document.getElementById('username').value, code = document.getElementById('room-input').value.toUpperCase();
         if(!name || !code) return alert("מלא פרטים!");
@@ -270,6 +340,11 @@
             conn.on('data', d => {
                 if(d.type === 'next') { document.getElementById('u-ctrl').style.display = 'grid'; document.getElementById('u-status').innerText = "בחר מהר!"; }
                 if(d.type === 'stop') { document.getElementById('u-ctrl').style.display = 'none'; document.getElementById('u-status').innerText = "נגמר הזמן!"; }
+                // האזנה לאירוע סיום משחק וקבלת הניקוד
+                if(d.type === 'end') {
+                    renderLeaderboard(d.scores);
+                    show('end-screen');
+                }
             });
         });
     }
