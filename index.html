@@ -32,9 +32,9 @@
         .leaderboard-table th { background: var(--purple); color: white; padding: 15px; font-size: 1.5rem; }
         .leaderboard-table td { padding: 15px; font-size: 1.3rem; border-bottom: 1px solid #eee; }
         .leaderboard-table tr:last-child td { border-bottom: none; }
-        .leaderboard-table tr:nth-child(1) td { background: #fff8dc; font-weight: bold; font-size: 1.6rem; color: #b8860b; } /* מקום ראשון - זהב */
-        .leaderboard-table tr:nth-child(2) td { background: #f5f5f5; font-weight: bold; font-size: 1.4rem; color: #708090; } /* מקום שני - כסף */
-        .leaderboard-table tr:nth-child(3) td { background: #fff5ee; font-weight: bold; font-size: 1.4rem; color: #cd7f32; } /* מקום שלישי - ארד */
+        .leaderboard-table tr:nth-child(1) td { background: #fff8dc; font-weight: bold; font-size: 1.6rem; color: #b8860b; } /* מקום ראשון */
+        .leaderboard-table tr:nth-child(2) td { background: #f5f5f5; font-weight: bold; font-size: 1.4rem; color: #708090; } /* מקום שני */
+        .leaderboard-table tr:nth-child(3) td { background: #fff5ee; font-weight: bold; font-size: 1.4rem; color: #cd7f32; } /* מקום שלישי */
 
         .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
         .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
@@ -77,7 +77,7 @@
         </div>
     </div>
 
-    <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 40px; padding: 20px 60px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל / שאלה הבאה ➡️</button>
+    <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 40px; padding: 20px 60px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל חידון ➡️</button>
 </div>
 
 <div id="user-screen" class="screen">
@@ -208,7 +208,7 @@
         if(audioCtx.state === 'suspended') audioCtx.resume();
         current++;
         
-        // בדיקה אם סיימנו את כל השאלות
+        // אם סיימנו את כל השאלות - מעבר למסך הסיום
         if(current >= quiz.length) {
             endGame();
             return;
@@ -227,6 +227,10 @@
         let timeLeft = 20;
         document.getElementById('timer-display').innerText = timeLeft;
         document.getElementById('timer-display').style.color = "var(--red)";
+        
+        // עדכון כפתור המנהל תוך כדי שאלות
+        document.getElementById('next-btn').style.display = 'none'; // מוסתר בזמן שהשאלה רצה
+
         Object.values(players).forEach(p => p.conn.send({type: 'next'}));
 
         clearInterval(timerInterval);
@@ -285,31 +289,35 @@
         }
         document.getElementById('current-leader').innerText = leaderText;
 
+        // שינוי טקסט הכפתור אם הגענו לשאלה האחרונה
+        const nextBtn = document.getElementById('next-btn');
+        if (current >= quiz.length - 1) {
+            nextBtn.innerText = "סיום חידון וטבלת דירוג 🏆";
+        } else {
+            nextBtn.innerText = "שאלה הבאה ➡️";
+        }
+        nextBtn.style.display = 'inline-block'; // חזרה להציג את הכפתור
         document.getElementById('round-results').style.display = 'block';
     }
 
-    // פונקציה חדשה לסיום המשחק
+    // פונקציית סיום המשחק והצגת הטבלה
     function endGame() {
-        // הכנת רשימת התוצאות ממוינת (מהגבוה לנמוך)
         const sortedScores = Object.values(players)
             .map(p => ({ name: p.name, score: p.score }))
             .sort((a, b) => b.score - a.score);
 
-        // שליחת התוצאות לכל המשתתפים
+        // שליחת התוצאות לטלפונים של המשתתפים
         Object.values(players).forEach(p => p.conn.send({ type: 'end', scores: sortedScores }));
 
-        // הצגת כפתור "משחק חדש" רק במסך המנהל
         document.getElementById('restart-btn').style.display = 'inline-block';
-        
-        // יצירת הטבלה והצגת המסך
         renderLeaderboard(sortedScores);
-        show('end-screen');
+        show('end-screen'); // מעבר לדף הסיום
     }
 
-    // פונקציה לבניית שורות הטבלה דינמית (משמשת גם מנהל וגם משתמש)
+    // ציור טבלת המשתתפים
     function renderLeaderboard(scoresData) {
         const tbody = document.getElementById('final-tbody');
-        tbody.innerHTML = ''; // ניקוי טבלה קודמת
+        tbody.innerHTML = ''; 
 
         if (scoresData.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3">אין משתתפים להצגה</td></tr>';
@@ -317,7 +325,6 @@
         }
 
         scoresData.forEach((player, index) => {
-            // התאמת אייקון למקומות הראשונים
             let placeObj = (index === 0) ? '🥇' : (index === 1) ? '🥈' : (index === 2) ? '🥉' : `${index + 1}`;
             
             tbody.innerHTML += `
@@ -340,7 +347,8 @@
             conn.on('data', d => {
                 if(d.type === 'next') { document.getElementById('u-ctrl').style.display = 'grid'; document.getElementById('u-status').innerText = "בחר מהר!"; }
                 if(d.type === 'stop') { document.getElementById('u-ctrl').style.display = 'none'; document.getElementById('u-status').innerText = "נגמר הזמן!"; }
-                // האזנה לאירוע סיום משחק וקבלת הניקוד
+                
+                // האזנה לאירוע סיום והצגת הטבלה בטלפון המשתתף
                 if(d.type === 'end') {
                     renderLeaderboard(d.scores);
                     show('end-screen');
