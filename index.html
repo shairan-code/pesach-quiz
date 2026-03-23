@@ -27,14 +27,13 @@
         .results-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-top: 25px; width: 90%; max-width: 800px; animation: slideUp 0.5s ease; border: 4px solid var(--green); display: none; }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* עיצוב טבלת התוצאות הסופית */
         .leaderboard-table { width: 100%; max-width: 700px; border-collapse: collapse; margin: 20px auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .leaderboard-table th { background: var(--purple); color: white; padding: 15px; font-size: 1.5rem; }
         .leaderboard-table td { padding: 15px; font-size: 1.3rem; border-bottom: 1px solid #eee; }
         .leaderboard-table tr:last-child td { border-bottom: none; }
-        .leaderboard-table tr:nth-child(1) td { background: #fff8dc; font-weight: bold; font-size: 1.6rem; color: #b8860b; } /* מקום ראשון */
-        .leaderboard-table tr:nth-child(2) td { background: #f5f5f5; font-weight: bold; font-size: 1.4rem; color: #708090; } /* מקום שני */
-        .leaderboard-table tr:nth-child(3) td { background: #fff5ee; font-weight: bold; font-size: 1.4rem; color: #cd7f32; } /* מקום שלישי */
+        .leaderboard-table tr:nth-child(1) td { background: #fff8dc; font-weight: bold; font-size: 1.6rem; color: #b8860b; } 
+        .leaderboard-table tr:nth-child(2) td { background: #f5f5f5; font-weight: bold; font-size: 1.4rem; color: #708090; } 
+        .leaderboard-table tr:nth-child(3) td { background: #fff5ee; font-weight: bold; font-size: 1.4rem; color: #cd7f32; } 
 
         .btn-red { background: var(--red); } .btn-blue { background: var(--blue); }
         .btn-yellow { background: var(--yellow); } .btn-green { background: var(--green); }
@@ -61,10 +60,10 @@
             <div id="room-code">טוען...</div>
             <div id="p-count" style="margin-top:5px; font-size:1.2rem; font-weight:bold;">משתתפים: 0</div>
         </div>
-        <div id="timer-display" class="timer">20</div>
+        <div id="timer-display" class="timer">30</div>
     </div>
 
-    <div id="admin-q" style="font-size: 2.8rem; font-weight: bold; margin-bottom: 30px; color: #222;"></div>
+    <div id="admin-q" style="font-size: 2.5rem; font-weight: bold; margin-bottom: 30px; color: #222;"></div>
     <div class="admin-grid" id="admin-opts"></div>
     
     <div id="round-results" class="results-card">
@@ -77,7 +76,10 @@
         </div>
     </div>
 
-    <button id="next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 40px; padding: 20px 60px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל חידון ➡️</button>
+    <div style="margin-top: 40px; display: flex; gap: 20px; justify-content: center; width: 100%; flex-wrap: wrap;">
+        <button id="interim-btn" class="main-btn" onclick="showInterim()" style="background: var(--blue); padding: 20px 40px; font-size: 1.5rem; border-radius: 50px; display: none;">טבלת ביניים 📊</button>
+        <button id="next-btn" class="main-btn" onclick="nextQ()" style="padding: 20px 40px; font-size: 1.5rem; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">התחל חידון ➡️</button>
+    </div>
 </div>
 
 <div id="user-screen" class="screen">
@@ -88,6 +90,24 @@
         <button class="user-btn btn-yellow" onclick="sendAns(2)"></button>
         <button class="user-btn btn-green" onclick="sendAns(3)"></button>
     </div>
+</div>
+
+<div id="interim-screen" class="screen">
+    <h1 style="font-size: 3rem; color: var(--blue); margin-bottom: 10px;">📊 מצב נקודות נוכחי 📊</h1>
+    
+    <table class="leaderboard-table">
+        <thead>
+            <tr>
+                <th>מקום</th>
+                <th>שם משתתף</th>
+                <th>ניקוד</th>
+            </tr>
+        </thead>
+        <tbody id="interim-tbody"></tbody>
+    </table>
+    
+    <button id="interim-next-btn" class="main-btn" onclick="nextQ()" style="margin-top: 30px; font-size: 1.5rem; padding: 15px 40px; border-radius: 50px; display: none;">המשך לחידון ➡️</button>
+    <div id="interim-wait-text" style="margin-top:20px; font-size:1.5rem; display:none;">ממתין למנהל שימשיך את המשחק...</div>
 </div>
 
 <div id="end-screen" class="screen">
@@ -102,8 +122,7 @@
                 <th>ניקוד</th>
             </tr>
         </thead>
-        <tbody id="final-tbody">
-            </tbody>
+        <tbody id="final-tbody"></tbody>
     </table>
     
     <button id="restart-btn" class="main-btn" onclick="location.reload()" style="margin-top: 30px; font-size: 1.2rem; display: none;">משחק חדש 🔄</button>
@@ -115,21 +134,41 @@
     let quiz = [
         { q: "מי יודע שישה בשיר אחד מי יודע?", a: ["שישה ימי בראשית", "שישה אבות", "שישה חומשי תורה", "שישה סדרי משנה"], c: 3 },
         { q: "מיהי שעמדה לאבותינו ולנו?", a: ["ההבטחה שאלוקים שומר על ישראל", "ציפורה עמדה", "המצווה לזכור את יציאת מצרים", "הזרוע הנטויה שבה הוציא הקב“ה את ישראל ממצרים"], c: 0 },
+        { q: "מי המורה שהכי סביר שנמצא אותו בהפסקות בחדר המורים שותה את הקפה החמישי שלו?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 0 },
         { q: "כמה פעמים מופיע משה רבנו בהגדה?", a: ["שלוש פעמים", "פעם אחת בלבד", "47 פעמים", "20 פעמים"], c: 1 },
         { q: "מצה זו שאנו אוכלים על שום מה?", a: ["על שום, פלפל ושמן זית", "על שום הרעב של אבותינו בארץ מצרים", "על שום שלא הספיק בצקם של אבותינו להחמיץ", "על שום איסור אכילת חמץ"], c: 2 },
+        { q: "איזה מורה הכי סביר שיענה להודעת ווטסאפ של תלמיד ב-2 בלילה?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 1 },
         { q: "מהי התשובה הנכונה לשאלה 'מה נשתנה'?", a: ["שבלילה הזה שותים ארבע כוסות", "שבלילה הזה כולו מצה", "שבלילה הזה כולו מרור", "כל התשובות נכונות"], c: 3 },
         { q: "למה טובלים את הכרפס במי מלח?", a: ["כדי להזכיר את דמעות העבדות", "כדי לסמל את הים", "כדי להוסיף טעם", "כדי לשמור על המסורת"], c: 0 },
+        { q: "מי המורה עם ה'אאוטפיט' (בגדים) הכי מושקע בבית הספר?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 2 },
         { q: "מדוע מונחים על הקערה גם הזרוע וגם הביצה, ומהו הקשר המשותף ביניהן?", a: ["שניהם מסמלים את המרירות של העבדות במצרים ואת הדמעות של בני ישראל", "שניהם מהווים זכר לקורבנות שהוקרבו בבית המקדש - קורבן הפסח וקורבן החגיגה", "שניהם מסמלים את הטיט ואת העבודה הקשה בבניית הפירמידות", "הם נועדו רק כדי לקשט את הקערה ולעורר את סקרנותם של הילדים בשולחן הסדר"], c: 1 },
         { q: "הכרפס הוא ירק שמטרתו היחידה היא להזכיר לנו את עבודת הפרך במצרים?", a: ["False", "True"], c: 0 },
+        { q: "אם היה פורץ מרד בבית הספר, איזה מורה היה מצטרף לתלמידים במקום לעצור אותם?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 3 },
         { q: "עבדים היינו לפרעה ב___", a: ["ירושלים", "בבל", "כנען", "מצרים"], c: 3 },
         { q: "מה בנו בני ישראל בעיר רעמסס תחת עול השעבוד?", a: ["גשרים וכבישים", "בתי כנסת ובתי ספר", "ערי מסכנות ומחסנים", "גנים ופארקים"], c: 2 },
+        { q: "מי המורה שיש לו את הכתב הכי לא קריא על הלוח?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 0 },
         { q: "מה קרה לחיילי פרעה שנכנסו אחרי ישראל לתוך הים?", a: ["טבעו בתוך הים", "הפכו לדגים", "חזרו למצרים", "הפכו לנציב מלח"], c: 0 },
         { q: "מה שרו בני ישראל לאחר שעברו את הים?", a: ["תהילים", "שירת הים", "שיר השירים", "מגילת רות"], c: 1 },
+        { q: "מי המורה שהכי סביר שיהפוך לכוכב טיקטוק ויראלי בטעות?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 1 },
         { q: "לכבוד מי מניחים כוס נוספת שלא שותים בליל הסדר?", a: ["לכבוד משה", "לכבוד אהרן", "לכבוד אליהו הנביא", "לכבוד אלוקים"], c: 2 },
         { q: "מה פירוש המילה מן?", a: ["לחם שירד משמיים", "מים שירדו משמיים", "מים שיצאו מהסלע", "בשר משמיים"], c: 0 },
+        { q: "איזה מורה היה בלהקת צופים/נוער כשהיה צעיר?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 2 },
         { q: "כמה ספרים יש בתורה?", a: ["1", "3", "4", "5"], c: 3 },
         { q: "מה עשו בני ישראל בזמן שמשה היה בהר?", a: ["מאושר הם שרו ורקדו בלי הפסקה", "בנו עגל זהב", "ישנו מרוב עייפות", "הכינו סעודה לכבוד חזרתו של משה"], c: 1 },
-        { q: "מה שואל הילד הקטן בתחילת הסדר?", a: ["מתי אוכלים", "אחד מי יודע", "מה נשתנה הלילה הזה מכל הלילות", "חד גדיא"], c: 2 }
+        { q: "מי מהמורים היה תלמיד 'בעייתי' בעצמו כשהיה בתיכון?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 3 },
+        { q: "מה שואל הילד הקטן בתחילת הסדר?", a: ["מתי אוכלים", "אחד מי יודע", "מה נשתנה הלילה הזה מכל הלילות", "חד גדיא"], c: 2 },
+        { q: "איזה מורה מחזיק בתחביב סודי ומפתיע?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 0 },
+        { q: "למי מהמורים יש הכי הרבה חיות מחמד בבית?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 1 },
+        { q: "איזה מורה למד בבית הספר הזה בעצמו כשהיה ילד?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 2 },
+        { q: "מהו משפט ה'קאץ'-פרייז' (המשפט הקבוע) של המורה [שם המורה]?", a: ["משפט א", "משפט ב", "משפט ג", "משפט ד"], c: 3 },
+        { q: "איזה מורה לא מצליח להפעיל את המקרן בערך 10 דקות בכל שיעור?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 0 },
+        { q: "מי המורה שמתחיל לספר סיפור על החיים שלו ושוכח מה היה נושא השיעור?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 1 },
+        { q: "איזה מורה נותן את המבחנים הכי קשים אבל את הציונים הכי טובים?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 2 },
+        { q: "אם כל המורים היו תקועים על אי בודד, מי היה מצליח להדליק אש ראשון?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 3 },
+        { q: "איזה מורה הכי דומה לדמות מסדרת טלוויזיה או סרט מוכר?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 0 },
+        { q: "למי מהמורים יש את הרינגטון (צלצול טלפון) הכי מביך בחדר מורים?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 1 },
+        { q: "מי המורה שהכי 'מפחיד' כשנכנסים לכיתה אבל מתגלה כהכי נחמד בשיחות אישיות?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 2 },
+        { q: "שאלה מסכמת: איזה מורה הכי דומה לאחד מעשרת המכות?", a: ["[שם מורה 1]", "[שם מורה 2]", "[שם מורה 3]", "[שם מורה 4]"], c: 3 }
     ];
 
     let peer, conn, current = -1, players = {}, timerInterval;
@@ -163,11 +202,9 @@
             const gain = audioCtx.createGain();
             osc.type = 'square';
             osc.frequency.value = freq;
-            
             const duration = (i === notes.length - 1) ? 0.6 : 0.15;
             gain.gain.setValueAtTime(0.1, t + timeOffset);
             gain.gain.exponentialRampToValueAtTime(0.01, t + timeOffset + duration);
-            
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(t + timeOffset);
             osc.stop(t + timeOffset + duration);
@@ -208,7 +245,6 @@
         if(audioCtx.state === 'suspended') audioCtx.resume();
         current++;
         
-        // אם סיימנו את כל השאלות - מעבר למסך הסיום
         if(current >= quiz.length) {
             endGame();
             return;
@@ -224,14 +260,18 @@
             if(quiz[current].a[i]) ui.innerHTML += `<div id="opt-${i}" class="admin-opt ${c}">${quiz[current].a[i]}</div>`;
         });
 
-        let timeLeft = 20;
+        let timeLeft = 30;
         document.getElementById('timer-display').innerText = timeLeft;
         document.getElementById('timer-display').style.color = "var(--red)";
         
-        // עדכון כפתור המנהל תוך כדי שאלות
-        document.getElementById('next-btn').style.display = 'none'; // מוסתר בזמן שהשאלה רצה
+        document.getElementById('next-btn').style.display = 'none'; 
+        document.getElementById('interim-btn').style.display = 'none'; 
 
+        // עדכון למשתמשים שהשאלה התחילה
         Object.values(players).forEach(p => p.conn.send({type: 'next'}));
+
+        // וידוא שהמנהל חוזר למסך השאלות (חשוב אם הגענו ממסך ביניים)
+        show('admin-screen');
 
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
@@ -289,34 +329,54 @@
         }
         document.getElementById('current-leader').innerText = leaderText;
 
-        // שינוי טקסט הכפתור אם הגענו לשאלה האחרונה
         const nextBtn = document.getElementById('next-btn');
+        const interimBtn = document.getElementById('interim-btn');
+        
+        // אם זו השאלה האחרונה - אין טעם להציג טבלת ביניים
         if (current >= quiz.length - 1) {
             nextBtn.innerText = "סיום חידון וטבלת דירוג 🏆";
+            interimBtn.style.display = 'none';
         } else {
             nextBtn.innerText = "שאלה הבאה ➡️";
+            interimBtn.style.display = 'inline-block';
         }
-        nextBtn.style.display = 'inline-block'; // חזרה להציג את הכפתור
+        nextBtn.style.display = 'inline-block'; 
         document.getElementById('round-results').style.display = 'block';
     }
 
-    // פונקציית סיום המשחק והצגת הטבלה
+    // פונקציה חדשה: הצגת טבלת ביניים
+    function showInterim() {
+        const sortedScores = Object.values(players)
+            .map(p => ({ name: p.name, score: p.score }))
+            .sort((a, b) => b.score - a.score);
+
+        // שליחת הפקודה למשתמשים
+        Object.values(players).forEach(p => p.conn.send({ type: 'interim', scores: sortedScores }));
+
+        renderLeaderboard(sortedScores, 'interim-tbody');
+        
+        // הצגת כפתורי הניהול
+        document.getElementById('interim-next-btn').style.display = 'inline-block';
+        document.getElementById('interim-wait-text').style.display = 'none';
+        
+        show('interim-screen');
+    }
+
     function endGame() {
         const sortedScores = Object.values(players)
             .map(p => ({ name: p.name, score: p.score }))
             .sort((a, b) => b.score - a.score);
 
-        // שליחת התוצאות לטלפונים של המשתתפים
         Object.values(players).forEach(p => p.conn.send({ type: 'end', scores: sortedScores }));
 
         document.getElementById('restart-btn').style.display = 'inline-block';
-        renderLeaderboard(sortedScores);
-        show('end-screen'); // מעבר לדף הסיום
+        renderLeaderboard(sortedScores, 'final-tbody');
+        show('end-screen'); 
     }
 
-    // ציור טבלת המשתתפים
-    function renderLeaderboard(scoresData) {
-        const tbody = document.getElementById('final-tbody');
+    // פונקציה חכמה לרינדור טבלאות (מקבלת את ה-ID של הטבלה הרלוונטית)
+    function renderLeaderboard(scoresData, tbodyId) {
+        const tbody = document.getElementById(tbodyId);
         tbody.innerHTML = ''; 
 
         if (scoresData.length === 0) {
@@ -326,7 +386,6 @@
 
         scoresData.forEach((player, index) => {
             let placeObj = (index === 0) ? '🥇' : (index === 1) ? '🥈' : (index === 2) ? '🥉' : `${index + 1}`;
-            
             tbody.innerHTML += `
                 <tr>
                     <td>${placeObj}</td>
@@ -345,12 +404,26 @@
             conn = peer.connect(code);
             conn.on('open', () => { conn.send({type: 'join', name: name}); show('user-screen'); });
             conn.on('data', d => {
-                if(d.type === 'next') { document.getElementById('u-ctrl').style.display = 'grid'; document.getElementById('u-status').innerText = "בחר מהר!"; }
-                if(d.type === 'stop') { document.getElementById('u-ctrl').style.display = 'none'; document.getElementById('u-status').innerText = "נגמר הזמן!"; }
+                if(d.type === 'next') { 
+                    document.getElementById('u-ctrl').style.display = 'grid'; 
+                    document.getElementById('u-status').innerText = "בחר מהר!"; 
+                    show('user-screen'); // וידוא חזרה למסך הכפתורים
+                }
+                if(d.type === 'stop') { 
+                    document.getElementById('u-ctrl').style.display = 'none'; 
+                    document.getElementById('u-status').innerText = "נגמר הזמן!"; 
+                }
                 
-                // האזנה לאירוע סיום והצגת הטבלה בטלפון המשתתף
+                // האזנה למסך ביניים
+                if(d.type === 'interim') {
+                    renderLeaderboard(d.scores, 'interim-tbody');
+                    document.getElementById('interim-next-btn').style.display = 'none';
+                    document.getElementById('interim-wait-text').style.display = 'block';
+                    show('interim-screen');
+                }
+                
                 if(d.type === 'end') {
-                    renderLeaderboard(d.scores);
+                    renderLeaderboard(d.scores, 'final-tbody');
                     show('end-screen');
                 }
             });
